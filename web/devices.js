@@ -58,6 +58,7 @@
         glassInset: 0.95, backInset: 0.8, fillet: 0.8, sideBulge: 0.08,
         islandW: 52, islandH: 52, islandTop: 8.5, islandR: 26,
         islandDepth: 2.1, islandMat: 'glass',
+        backTextureCrop: [0.107, 0.005, 0.893, 0.995],
         lenses: [],
         buttons: [[39, 18, 1], [64, 12, 1]],
         buttonThick: 2.4, buttonOut: 0.45,
@@ -67,6 +68,7 @@
         holes: [[-7.5, 4.6, 2.05], [0, 4.6, 2.15], [7.5, 4.6, 2.05]],
       },
       cutout: { y: 0, half: 0, r: 0 },
+      backTexture: 'assets/huawei-mate90-pro-max-collector-back.png',
       rough: 0.52,
       colors: [
         { id: 'collector-green', name: '典藏绿', swatch: '#b6cc80', frame: [0.09, 0.15, 0.045], back: [0.42, 0.55, 0.24] },

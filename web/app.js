@@ -285,14 +285,17 @@
   in vec3 aPos;
   in vec3 aNor;
   in float aMat;
+  in vec2 aUv;
   out vec3 vN;
   out vec3 vW;
+  out vec2 vUv;
   flat out int vMat;
   ${COMMON_VS}
   void main() {
     vW = uModel * aPos;
     vN = uModel * aNor;
     vMat = int(aMat + 0.5);
+    vUv = aUv;
     gl_Position = project(vW);
   }`;
 
@@ -300,11 +303,14 @@
   precision highp float;
   in vec3 vN;
   in vec3 vW;
+  in vec2 vUv;
   flat in int vMat;
   out vec4 outColor;
   uniform vec3 uEye;
   uniform vec3 uFrame, uBack;
   uniform float uRough;
+  uniform sampler2D uBackTex;
+  uniform bool uUseBackTex;
   ${COLOR_GLSL}
 
   // 摄影棚：上方大柔光箱 + 右侧灯条 + 左侧轮廓光，外加上亮下暗的环境渐变。
@@ -351,7 +357,12 @@
     vec3 R = reflect(-V, N);
     float nv = clamp(dot(N, V), 0.0, 1.0);
     vec3 col;
-    if (vMat == 0 || vMat == 3 || vMat == 1) {
+    if (uUseBackTex && (vMat == 1 || vMat == 2)) {
+      vec4 photo = texture(uBackTex, vUv);
+      vec3 base = srgb2lin(photo.rgb) * (0.92 + 0.08 * max(dot(N, normalize(vec3(-0.2, 0.7, 0.6))), 0.0));
+      col = mix(uBack * 0.4, base, photo.a);
+      col += vec3(0.025) * pow(1.0 - nv, 5.0);
+    } else if (vMat == 0 || vMat == 3 || vMat == 1) {
       // 喷砂阳极氧化铝: 金属高光带本色、粗糙度高；氧化层染色带一点漫反射。
       // 背板为同色磨砂玻璃: 非金属，漫反射为主，高光弱而宽。
       bool metal = vMat != 1;
@@ -401,6 +412,7 @@
   uniform vec3 uEye;
   uniform vec2 uScreenHalf, uDispMM, uImgScale;
   uniform vec3 uCut;
+  uniform vec3 uHole0, uHole1, uHole2;
   uniform float uCorner, uRot;
   uniform int uMode;
   uniform sampler2D uPal;   // 256×1 色表（热力图配色，与方向盘一致）
@@ -435,6 +447,11 @@
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
   }
 
+  float aperture(vec2 p, vec3 hole, float px) {
+    if (hole.z <= 0.0) return 0.0;
+    return 1.0 - smoothstep(hole.z - px, hole.z + px, length(p - hole.xy));
+  }
+
   void main() {
     vec2 pp = vLocal;
     float px = length(fwidth(pp));
@@ -467,7 +484,12 @@
     }
     vec2 q = pp - vec2(0.0, uScreenHalf.y - uCut.x);
     q.x = max(abs(q.x) - uCut.y, 0.0);
-    scr *= smoothstep(uCut.z, uCut.z + px, length(q));
+    if (uCut.z > 0.0) scr *= smoothstep(uCut.z, uCut.z + px, length(q));
+    float h0 = aperture(pp, uHole0, px), h1 = aperture(pp, uHole1, px), h2 = aperture(pp, uHole2, px);
+    scr = mix(scr, vec3(0.001, 0.002, 0.005), max(max(h0, h1), h2));
+    float glint0 = 1.0 - smoothstep(0.08, 0.3, length(pp - uHole0.xy));
+    float glint2 = 1.0 - smoothstep(0.08, 0.3, length(pp - uHole2.xy));
+    scr += vec3(0.003, 0.009, 0.024) * (h0 * glint0 + h2 * glint2);
 
     outColor = vec4(mix(vec3(0.004), scr, screen), 1.0);
   }`;
@@ -508,7 +530,7 @@
       gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
     };
     attr('aPos', mesh.pos, 3);
-    if (withNormals) { attr('aNor', mesh.nor, 3); attr('aMat', mesh.mat, 1); }
+    if (withNormals) { attr('aNor', mesh.nor, 3); attr('aMat', mesh.mat, 1); attr('aUv', mesh.uv, 2); }
     const ib = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.idx), gl.STATIC_DRAW);
@@ -518,6 +540,15 @@
   gl.useProgram(screenProg.p);
   gl.uniform1i(screenProg.u.uImg, 0);
   gl.uniform1i(screenProg.u.uLut, 1);
+
+  gl.useProgram(bodyProg.p);
+  gl.uniform1i(bodyProg.u.uBackTex, 3);
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.useProgram(screenProg.p);
 
   const lutTex = {};
   function bindLUT(id) {
@@ -532,6 +563,38 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     lutTex[id] = { tex, width: lut.width };
     return lut.width;
+  }
+
+  const backTextures = new Map();
+  function bindBackTexture(path) {
+    let entry = backTextures.get(path);
+    if (!entry) {
+      const tex = gl.createTexture();
+      entry = { tex, ready: false };
+      backTextures.set(path, entry);
+      const img = new Image();
+      img.onload = () => {
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        entry.ready = true;
+        requestRender();
+      };
+      img.src = path;
+    }
+    if (entry.ready) {
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, entry.tex);
+    }
+    return entry.ready;
   }
 
   // 热力图色表放在纹理单元 2
@@ -636,6 +699,8 @@
       gl.uniform3fv(bodyProg.u.uFrame, c.frame);
       gl.uniform3fv(bodyProg.u.uBack, c.back);
       gl.uniform1f(bodyProg.u.uRough, v.dev.spec.rough ?? 0.55);
+      const hasBackTexture = v.dev.spec.backTexture && bindBackTexture(v.dev.spec.backTexture);
+      gl.uniform1i(bodyProg.u.uUseBackTex, hasBackTexture ? 1 : 0);
       gl.bindVertexArray(v.dev.body.vao);
       setCommon(bodyProg, M, v);
       gl.drawElements(gl.TRIANGLES, v.dev.body.count, gl.UNSIGNED_INT, 0);
@@ -653,6 +718,11 @@
       gl.uniform2fv(screenProg.u.uScreenHalf, d.screenHalf);
       gl.uniform1f(screenProg.u.uCorner, d.spec.screen.corner);
       gl.uniform3f(screenProg.u.uCut, cut.y, cut.half, cut.r);
+      const holes = d.spec.screen.holes || [];
+      for (let h = 0; h < 3; h++) {
+        const hole = holes[h];
+        gl.uniform3f(screenProg.u[`uHole${h}`], hole ? hole[0] : 0, hole ? d.screenHalf[1] - hole[1] : 0, hole ? hole[2] : 0);
+      }
       gl.uniform2fv(screenProg.u.uDispMM, dispMM(d));
       gl.uniform2fv(screenProg.u.uImgScale, imgScale(d));
       gl.uniform1i(screenProg.u.uLutW, bindLUT(ids[i]));
@@ -730,7 +800,6 @@
     $('distV').textContent = Math.round(S.dist / 10) + ' cm';
     $('heroTheta').textContent = Math.round(S.theta) + '°';
     $('heroDir').textContent = S.theta < 0.5 ? '正对屏幕' : `从${Viz.dirName(S.psi)}看`;
-    $('heroSub').textContent = `屏幕中心离轴角 · 观看距离 ${Math.round(S.dist / 10)} cm`;
     $('legend').classList.toggle('show', S.mode === 2);
     updatePad(M);
     updateCharts();
@@ -776,6 +845,7 @@
     if (palApplied === S.pal) return;
     palApplied = S.pal;
     $('palette').value = S.pal;
+    window.StyledDropdown?.sync($('palette'));
     const P = Viz.palette(S.pal);
     setPaletteTex(S.pal);
     $('angRamp').style.background = Viz.paletteCSS(S.pal, P.banded ? 7 : 0, P.flipAngle);
@@ -785,10 +855,9 @@
   function updatePadRead() {
     const id = activeIds()[0], g = getGrid(id), mf = metricFmt[S.padMetric];
     const h = padHover || { theta: S.theta, psi: S.psi };
-    const where = h.theta < 0.5 ? '正对' : `${Math.round(h.theta)}° ${Viz.dirName(h.psi)}`;
     const who = S.compare ? `<span class="key" style="--k:${SERIES[0]}"></span>` : '';
     const v = g[S.padMetric](h.theta, h.psi + S.rot);
-    padRead.innerHTML = `${who}<span class="dim">${padHover ? '指针处' : '当前'}</span> ${where} · <b>${mf.fmt(v)}</b>`;
+    padRead.innerHTML = `${who}<b>${Math.round(h.theta)}°</b> · ${mf.fmt(v)}`;
   }
 
   function updatePad(M) {
@@ -833,7 +902,6 @@
     const ids = S.stereo ? [activeIds()[0]] : activeIds();
     const psi = psiLocal();
     const series = ids.map((id, i) => Object.assign({ label: shortLabel(byId(id)), color: SERIES[i] }, seriesFor(id, psi)));
-    $('curveDir').textContent = `沿${S.theta < 0.5 ? '右侧' : Viz.dirName(S.psi)}方向 · 屏幕中心`;
     const leg = series.length > 1
       ? series.map((s) => `<span><i style="--k:${s.color}"></i>${s.label}</span>`).join('') : '';
     if ($('curveLegend')._html !== leg) { $('curveLegend').innerHTML = leg; $('curveLegend')._html = leg; }
@@ -1118,24 +1186,20 @@
   });
 
   function renderDevCards() {
-    $('devCards').innerHTML = DEVICES.map((d) => {
-      const k = specKey(d) || d, suffix = d.slice(k.length).trim();
-      const t = privacyText(d);
-      const sub = hasPrivacy(d) ? `${t.off} / ${t.on} 两组实测` : '一组实测';
-      return `<button class="dev-card${d === S.device ? ' on' : ''}" data-d="${d}">` +
-        `<span class="ph" style="--c1:${colorOf(d).swatch}"></span>` +
-        `<span><b>${k}${suffix ? `<span class="badge" title="屏幕版本">${suffix}</span>` : ''}</b><small>${sub}</small></span></button>`;
-    }).join('');
+    const select = $('deviceSelect');
+    if (!select.options.length) {
+      select.innerHTML = DEVICES.map((d) => `<option value="${d}">${d}</option>`).join('');
+    }
+    select.value = S.device;
+    window.StyledDropdown?.sync(select);
   }
-  $('devCards').addEventListener('click', (e) => {
-    const b = e.target.closest('.dev-card');
-    if (!b) return;
-    S.device = b.dataset.d;
+  $('deviceSelect').addEventListener('change', (event) => {
+    S.device = event.target.value;
     syncProfileUI();
     requestRender();
   });
 
-  // 对比的快捷组合：两台机型之间、同一机型防窥前后
+    // 对比的快捷组合：两台机型之间、同一机型防窥前后
   const PRESETS = (() => {
     const out = [];
     for (let i = 0; i < DEVICES.length; i++) for (let j = i + 1; j < DEVICES.length; j++) {
@@ -1152,35 +1216,35 @@
     }
     return out;
   })();
-  $('presets').innerHTML = PRESETS.map((p, i) => `<button data-i="${i}">${p.label}</button>`).join('');
-  $('presets').addEventListener('click', (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    S.slots = PRESETS[+b.dataset.i].slots.slice();
+  $('presets').innerHTML = '<option value="" disabled>自定义组合</option>' +
+    PRESETS.map((p, i) => `<option value="${i}">${p.label}</option>`).join('');
+  $('presets').addEventListener('change', (event) => {
+    if (event.target.value === '') return;
+    const preset = PRESETS[Number(event.target.value)];
+    if (!preset) return;
+    S.slots = preset.slots.slice();
     syncProfileUI();
     requestRender();
   });
 
-  function syncProfileUI() {
+    function syncProfileUI() {
     const showPriv = !S.compare && hasPrivacy(S.device);
     $('privacyRow').hidden = !showPriv;
     $('privacyText').textContent = privacyText(S.device).switch;
-    $('privacyHint').textContent = privacyText(S.device).hint;
     $('privacy').checked = !!(variant(S.device, S.privacy) || {}).privacy;
     $('secDevice').hidden = S.compare;
     $('secSlots').hidden = !S.compare;
     $('stereoGroup').hidden = !S.stereo;
     [0, 1].forEach((i) => { $('slot' + i).value = S.slots[i]; });
-    document.querySelectorAll('#presets button').forEach((b) => {
-      const p = PRESETS[+b.dataset.i];
-      b.classList.toggle('on', p.slots[0] === S.slots[0] && p.slots[1] === S.slots[1]);
-    });
+    const activePreset = PRESETS.findIndex((p) => p.slots[0] === S.slots[0] && p.slots[1] === S.slots[1]);
+    $('presets').value = activePreset < 0 ? '' : String(activePreset);
     syncSeg('compare', S.stereo ? 2 : S.compare ? 1 : 0);
     document.body.classList.toggle('stereo', S.stereo);
     document.title = `可视角度仿真 · ${activeDevices().join(' vs ')}`;
     renderDevCards();
     renderSwatches();
     if (S.pattern) loadPattern(S.pattern);
+    window.StyledDropdown?.syncAll();
   }
   const options = PROFILES.slice().sort((a, b) => rank(a.device) - rank(b.device) || a.privacy - b.privacy)
     .map((p) => `<option value="${p.id}">${profileLabel(p, true)}</option>`).join('');
@@ -1203,8 +1267,8 @@
     const w = S.rot === 90 ? sc.resH : sc.resW, h = S.rot === 90 ? sc.resW : sc.resH;
     const key = `${name}:${w}x${h}`;
     S.pattern = name;
-    document.querySelectorAll('#patterns [data-p]').forEach((b) => b.classList.toggle('on', b.dataset.p === name));
-    document.querySelector('#patterns .upload').classList.remove('on');
+    $('patterns').value = name;
+    window.StyledDropdown?.sync($('patterns'));
     if (key === patternKey && !force) return;
     patternKey = key;
     setImage(Patterns.make(name, w, h));
@@ -1219,12 +1283,18 @@
     bmp.close();
     S.pattern = null;
     patternKey = '';
-    document.querySelectorAll('#patterns [data-p]').forEach((b) => b.classList.remove('on'));
-    document.querySelector('#patterns .upload').classList.add('on');
+    $('patterns').value = 'upload';
+    window.StyledDropdown?.sync($('patterns'));
     setImage(cv);
     toast(`已载入 ${file.name || '图片'}`);
   }
-  $('patterns').addEventListener('click', (e) => { const b = e.target.closest('[data-p]'); if (b) loadPattern(b.dataset.p); });
+  $('patterns').addEventListener('change', (event) => {
+    if (event.target.value === 'upload') {
+      event.target.value = S.pattern || 'upload';
+      window.StyledDropdown?.sync(event.target);
+      $('file').click();
+    } else loadPattern(event.target.value);
+  });
   $('file').addEventListener('change', (e) => loadFile(e.target.files[0]));
 
   let dragDepth = 0;
@@ -1286,7 +1356,7 @@
 
   // ---------- 模式：屏幕仿真（默认，本页原有工具）/ 场景演示（三维，scene3d.js，做动画用，从“画面 → 更多”进入） ----------
   let appMode = 'sim', scene3d = null, scene3dLoading = null;
-  const S3D_VER = 5;
+  const S3D_VER = 7;
   const loadScript = (src) => new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = src; s.onload = res; s.onerror = () => rej(new Error('无法加载 ' + src));
@@ -1321,6 +1391,7 @@
   // ---------- 启动 ----------
   window.addEventListener('resize', resize);
   readHash();
+  window.StyledDropdown.init();
   setDist(S.dist / 10);
   syncProfileUI();
   Patterns.ready.then(() => { if (S.pattern) loadPattern(S.pattern, true); });
