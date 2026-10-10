@@ -4,8 +4,8 @@
     {机型名: {"-70°": {"白": [X, Y, Z], "红": [...], "绿": [...], "蓝": [...], "黑": [...]}, ...}}
 
 递归扫描数据目录，按机型名去掉方向词后分组为多套数据（例如 "小米 18 Pro Max" 与
-"小米 18 Pro Max 防窥"），每套需包含 竖着转 / 30° / 60° / 横着转 四个方向。
-方向优先从机型名推断，名字里没有方向词时再从文件名推断。
+"小米 18 Pro Max 防窥"），每套可包含多个面内方向，当前数据为 0° / 30° / 60° / 90° / 120° / 150°。
+方向优先从文件名推断，文件名没有方向词时再从内部机型标签推断；内部标签原样保留。
 所在文件夹名以机型名开头时，多出的部分作为后缀并入机型名，用于区分屏幕供应商
 （例: 文件夹 "iphone18 Pro Max GH3" → 机型 "iPhone 18 Pro Max GH3"）。
 机型名含“防窥”的为防窥状态；路径含“防窥膜”时标记为贴膜（privacyKind = film），否则为防窥模式。
@@ -21,6 +21,14 @@ import re
 import sys
 
 PRIMARY_KEYS = {"白": "W", "红": "R", "绿": "G", "蓝": "B", "黑": "K"}
+# Profile IDs are part of shared comparison URLs, so keep established assignments stable.
+PROFILE_IDS = {
+    ("iPhone 18 Pro Max GH3", False): "p0",
+    ("iPhone 18 Pro Max GH3", True): "p1",
+    ("小米 18 Pro Max", False): "p2",
+    ("小米 18 Pro Max", True): "p3",
+    ("华为 Mate 90 Pro Max 典藏版", False): "p4",
+}
 
 
 class SafeUnpickler(pickle.Unpickler):
@@ -71,9 +79,9 @@ def load(path):
         for cn, key in PRIMARY_KEYS.items():
             data[key].append([round(float(x), 6) for x in table[a][cn]])
     try:
-        phi = infer_phi(name)
-    except ValueError:
         phi = infer_phi(os.path.splitext(os.path.basename(path))[0])
+    except ValueError:
+        phi = infer_phi(name)
     return {
         "name": name,
         "file": os.path.basename(path),
@@ -88,7 +96,7 @@ def main():
     src = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(here)
     out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(here), "web", "data.js")
 
-    files = glob.glob(os.path.join(src, "**", "*.ang2"), recursive=True)
+    files = sorted(glob.glob(os.path.join(src, "**", "*.ang2"), recursive=True))
     if not files:
         sys.exit(f"{src} 下没有 .ang2 文件")
 
@@ -97,6 +105,7 @@ def main():
         s = load(p)
         s["file"] = os.path.relpath(p, src).replace(os.sep, "/")
         key = " ".join(re.sub(r"垂直|水平|\d+(\.\d+)?°", " ", s["name"]).split())
+        key = key.replace("防窥膜", "防窥")
         sub = os.path.dirname(os.path.relpath(p, src))
         base = " ".join(key.replace("防窥", " ").split())
         suffix = folder_suffix(os.path.basename(sub), base) if sub else ""
@@ -128,9 +137,23 @@ def main():
             # 路径含“防窥膜”视为贴膜，否则为机器自带的防窥模式
             profile["privacyKind"] = "film" if any("防窥膜" in s["file"] for s in sets) else "mode"
         profiles.append(profile)
-    profiles.sort(key=lambda p: (p["device"], p["privacy"]))
-    for i, p in enumerate(profiles):
-        p["id"] = f"p{i}"
+    profiles.sort(key=lambda p: (
+        (0, int(PROFILE_IDS[(p["device"], p["privacy"])][1:]))
+        if (p["device"], p["privacy"]) in PROFILE_IDS
+        else (1, p["device"], p["privacy"])
+    ))
+    used_ids = set(PROFILE_IDS.values())
+    next_id = len(PROFILE_IDS)
+    for p in profiles:
+        key = (p["device"], p["privacy"])
+        if key in PROFILE_IDS:
+            p["id"] = PROFILE_IDS[key]
+        else:
+            while f"p{next_id}" in used_ids:
+                next_id += 1
+            p["id"] = f"p{next_id}"
+            used_ids.add(p["id"])
+            next_id += 1
 
     payload = {"units": "XYZ (cd/m²)", "angles": angles, "profiles": profiles}
     os.makedirs(os.path.dirname(out), exist_ok=True)
