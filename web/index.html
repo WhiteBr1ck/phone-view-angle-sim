@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="light dark">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("view-angle-theme")==="light"?"light":"dark"}catch(e){document.documentElement.dataset.theme="dark"}</script>
 <title>可视角度仿真</title>
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body data-layout="wide">
 <div class="sframe" id="sf0"></div>
 <div class="sframe" id="sf1"></div>
 <canvas id="gl" aria-label="手机屏幕可视角仿真画面"></canvas>
 <div id="scene3d" aria-label="三维场景演示"></div>
-<!-- 三维场景演示（做动画用）：默认不显示，从“画面 → 更多”进入；进入后顶部出现这个切换，可回到屏幕仿真 -->
-<nav class="app-mode seg" id="appMode" aria-label="模式">
-  <button data-v="scene">场景演示</button>
-  <button data-v="sim" class="on">屏幕仿真</button>
-</nav>
+<div class="scene-controls" id="sceneControls">
+  <button type="button" class="scene-theme" id="sceneThemeToggle" aria-label="切换明暗主题" title="切换明暗主题">◐</button>
+  <button type="button" class="scene-close" id="close3d" aria-label="关闭三维场景，返回屏幕仿真" title="返回屏幕仿真">×</button>
+</div>
 
 <!-- 宽屏时整体移入左栏；其他布局时浮在舞台左上角 -->
 <header id="hud">
@@ -39,6 +39,7 @@
     <button data-tab="screen" role="tab">画面</button>
     <span class="tabs-fold" aria-hidden="true"></span>
   </nav>
+  <div class="theme-row"><span>外观</span><button id="themeToggle" type="button" aria-label="切换明暗模式">浅色模式</button></div>
   <div id="panelBody">
 
     <!-- ===== 视角 ===== -->
@@ -60,7 +61,6 @@
               <div class="ramp" id="padRamp"></div>
               <div class="ramp-ticks" id="padTicks"></div>
             </div>
-            <select id="palette" data-styled class="mini-select" aria-label="热力图配色" title="热力图配色（方向盘与离轴角分布共用）"></select>
           </div>
           <div class="angle-row">
             <div class="chips" id="thetaChips">
@@ -96,7 +96,6 @@
         <button data-v="1">双机对比</button>
         <button data-v="2">双眼立体</button>
       </div>
-      <button type="button" id="open3d" class="more-btn">进入三维场景演示 ↗</button>
     </section>
 
     <section class="sec" data-tab="device" id="secDevice">
@@ -109,8 +108,7 @@
     </section>
 
     <section class="sec" data-tab="device" id="secSlots" hidden>
-      <h2>对比组合</h2>
-      <select id="presets" data-styled data-label="对比组合" aria-label="对比组合"></select>
+      <h2>对比机型</h2>
       <label class="slot"><span class="key" style="--k:var(--s1)"></span><select id="slot0" data-styled aria-label="左侧机型"></select></label>
       <label class="slot"><span class="key" style="--k:var(--s2)"></span><select id="slot1" data-styled aria-label="右侧机型"></select></label>
     </section>
@@ -138,7 +136,7 @@
     <!-- ===== 画面 ===== -->
     <section class="sec" data-tab="screen" id="secPattern">
       <h2>屏幕内容</h2>
-      <select id="patterns" data-styled data-label="屏幕内容" aria-label="屏幕内容">
+      <div class="pattern-row"><select id="patterns" data-styled data-label="屏幕内容" aria-label="屏幕内容">
         <option value="ui">浅色设置</option>
         <option value="dark">深色设置</option>
         <option value="read">阅读</option>
@@ -146,8 +144,8 @@
         <option value="rgbw">三原色</option>
         <option value="checker">色卡</option>
         <option value="gray">灰阶</option>
-        <option value="upload">上传图片…</option>
-      </select>
+        <option value="custom" disabled>自定义图片</option>
+      </select><button id="uploadImage" type="button" class="upload-action" aria-label="上传图片">上传图片</button></div>
       <input type="file" id="file" accept="image/*" hidden>
     </section>
 
@@ -181,6 +179,10 @@
         <dt>P</dt><dd>防窥开关</dd>
       </dl>
       </details>
+      <details class="keys-box more-box">
+        <summary>更多</summary>
+        <button id="open3d" class="more-btn">三维场景演示</button>
+      </details>
     </section>
 
   </div>
@@ -202,7 +204,7 @@
 <script src="phone3d.js"></script>
 <script src="viz.js?v=12"></script>
 <!-- 三维场景（scene3d-person.js、scene3d.js）只在进入场景演示时再加载，见 app.js -->
-<script src="dropdown.js?v=1"></script>
-<script src="app.js?v=16"></script>
+<script src="dropdown.js?v=2"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

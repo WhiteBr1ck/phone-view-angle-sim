@@ -5,7 +5,7 @@
   const SPECS = window.DEVICE_SPECS;
   const $ = (id) => document.getElementById(id);
   const DEG = Math.PI / 180;
-  const SERIES = ['#3987e5', '#d95926'];   // 对比时左 / 右两台的标识色（dataviz 参考调色板，深色底）
+  const SERIES = ['#638d96', '#b58b65'];   // 对比时左 / 右两台的标识色（dataviz 参考调色板，深色底）
 
   // 外观按机型名前缀匹配，同一机型不同屏幕供应商（如 “iPhone 18 Pro Max GH3”）共用外观
   const KNOWN = Object.keys(SPECS);
@@ -21,11 +21,11 @@
   const hasPrivacy = (device) => !!variant(device, true) && !!variant(device, false);
   const pick = (device) => variant(device, false) || variant(device, true);
   const shortName = (device) => device.split(' ')[0];
-  /** 图例用短名：“小米 · 防窥关闭”“iPhone GH3 · 未贴膜”。 */
+  const displayDevice = (name) => name === 'iPhone 18 Pro Max GH3' ? 'iPhone 18 Pro Max (GH3)' : name;
+  const privacySuffix = (p) => !p.privacy ? '' : p.privacyKind === 'film' ? '贴防窥膜' : '防窥开启';
   function shortLabel(p) {
-    const k = specKey(p.device) || p.device, suffix = p.device.slice(k.length).trim();
-    const name = [shortName(p.device), suffix].filter(Boolean).join(' ');
-    return hasPrivacy(p.device) ? `${name} · ${privacyText(p.device)[p.privacy ? 'on' : 'off']}` : name;
+    const suffix = privacySuffix(p);
+    return displayDevice(p.device) + (suffix ? ' · ' + suffix : '');
   }
 
   const S = {
@@ -97,8 +97,8 @@
   const privacyText = (device) => PRIVACY_TEXT[(variant(device, true) || {}).privacyKind] || PRIVACY_TEXT.mode;
   function profileLabel(p, withDevice = DEVICES.length > 1) {
     if (!hasPrivacy(p.device)) return p.device;
-    const t = privacyText(p.device), mode = p.privacy ? t.on : t.off;
-    return withDevice ? `${p.device} · ${mode}` : mode;
+    const state = privacySuffix(p);
+    return withDevice ? displayDevice(p.device) + (state ? ' · ' + state : '') : (state || displayDevice(p.device));
   }
   function activeIds() {
     if (S.compare) return S.slots;
@@ -768,7 +768,8 @@
   function placeCaption(el, v, html) {
     if (el._html !== html) { el.innerHTML = html; el._html = html; }
     el.classList.toggle('stereo', S.stereo);
-    el.style.width = S.stereo ? v.w - 20 + 'px' : '';
+    el.style.width = S.stereo ? Math.max(0, Math.min(v.w - 20, window.innerWidth - 24)) + 'px' : '';
+    el.style.maxWidth = S.stereo ? 'calc(100vw - 24px)' : '';
     el.style.display = 'block';
     el.style.left = v.cx + 'px';
     el.style.top = v.bottomY + 8 + 'px';
@@ -789,8 +790,8 @@
   const stat = (val, unit, label) => `<div><b>${val}${unit ? `<small>${unit}</small>` : ''}</b><span>${label}</span></div>`;
   function capName(p, i) {
     const key = S.compare ? `<span class="key" style="--k:${SERIES[i]}"></span>` : '';
-    const st = hasPrivacy(p.device) ? `<small>${privacyText(p.device)[p.privacy ? 'on' : 'off']}</small>` : '';
-    return `<div class="cap-name">${key}${p.device}${st}</div>`;
+    const state = privacySuffix(p);
+    return `<div class="cap-name">${key}${displayDevice(p.device)}${state ? `<small>${state}</small>` : ''}</div>`;
   }
 
   /** 屏幕中心对应的 (θ, ψ手机坐标)；θ≈0 时沿用当前方向，保证曲线方向稳定。 */
@@ -807,8 +808,7 @@
     if (S.stereo) {
       const b = binoStats(M, ids[0]);
       const html = capName(byId(ids[0]), 0) +
-        `<div class="cap-stats">${stat(b.dl.toFixed(1), '%', '双眼亮度差')}${stat(b.j.toFixed(2), 'JNCD', '双眼色度差')}${stat(b.de.toFixed(1), '', '双眼 ΔE2000')}</div>` +
-        `<div class="note">全屏平均${S.mode === 2 ? ' · 颜色为离轴角 0–70°' : ''}</div>`;
+        `<div class="cap-stats">${stat(b.dl.toFixed(1), '%', '双眼亮度差')}${stat(b.j.toFixed(2), 'JNCD', '双眼色度差')}${stat(b.de.toFixed(1), '', '双眼 ΔE2000')}</div>`;
       [0, 1].forEach((i) => placeCaption($('cap' + i), views[i], html));
       return;
     }
@@ -839,18 +839,14 @@
     lum: { t: (v) => v, levels: 10, ticks: ['0%', '50%', '100%'], fmt: (v) => `亮度 ${Math.round(v * 100)}%` },
     jncd: { t: (v) => v / JMAX, levels: JMAX / 2, ticks: ['0', String(JMAX / 2), JMAX + ' JNCD'], fmt: (v) => `色偏 ${v.toFixed(1)} JNCD` },
   };
-  $('palette').innerHTML = Object.entries(Viz.PALETTES).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('');
   let palApplied = '';
   function applyPalette() {
     if (palApplied === S.pal) return;
     palApplied = S.pal;
-    $('palette').value = S.pal;
-    window.StyledDropdown?.sync($('palette'));
     const P = Viz.palette(S.pal);
     setPaletteTex(S.pal);
     $('angRamp').style.background = Viz.paletteCSS(S.pal, P.banded ? 7 : 0, P.flipAngle);
   }
-  $('palette').addEventListener('change', (e) => { S.pal = e.target.value; requestRender(); });
 
   function updatePadRead() {
     const id = activeIds()[0], g = getGrid(id), mf = metricFmt[S.padMetric];
@@ -1188,41 +1184,14 @@
   function renderDevCards() {
     const select = $('deviceSelect');
     if (!select.options.length) {
-      select.innerHTML = DEVICES.map((d) => `<option value="${d}">${d}</option>`).join('');
+      select.innerHTML = DEVICES.map((d) => `<option value="${d}">${displayDevice(d)}</option>`).join('');
     }
     select.value = S.device;
     window.StyledDropdown?.sync(select);
   }
   $('deviceSelect').addEventListener('change', (event) => {
     S.device = event.target.value;
-    syncProfileUI();
-    requestRender();
-  });
-
-    // 对比的快捷组合：两台机型之间、同一机型防窥前后
-  const PRESETS = (() => {
-    const out = [];
-    for (let i = 0; i < DEVICES.length; i++) for (let j = i + 1; j < DEVICES.length; j++) {
-      out.push({ label: `${shortName(DEVICES[i])} vs ${shortName(DEVICES[j])}`, slots: [pick(DEVICES[i]).id, pick(DEVICES[j]).id] });
-    }
-    for (const d of DEVICES) {
-      if (!hasPrivacy(d)) continue;
-      out.push({ label: `${shortName(d)} ${privacyText(d).short}前后`, slots: [variant(d, false).id, variant(d, true).id] });
-    }
-    for (let i = 0; i < DEVICES.length; i++) for (let j = i + 1; j < DEVICES.length; j++) {
-      if (hasPrivacy(DEVICES[i]) && hasPrivacy(DEVICES[j])) {
-        out.push({ label: `${shortName(DEVICES[i])} vs ${shortName(DEVICES[j])} · 防窥`, slots: [variant(DEVICES[i], true).id, variant(DEVICES[j], true).id] });
-      }
-    }
-    return out;
-  })();
-  $('presets').innerHTML = '<option value="" disabled>自定义组合</option>' +
-    PRESETS.map((p, i) => `<option value="${i}">${p.label}</option>`).join('');
-  $('presets').addEventListener('change', (event) => {
-    if (event.target.value === '') return;
-    const preset = PRESETS[Number(event.target.value)];
-    if (!preset) return;
-    S.slots = preset.slots.slice();
+    S.privacy = false;
     syncProfileUI();
     requestRender();
   });
@@ -1236,11 +1205,10 @@
     $('secSlots').hidden = !S.compare;
     $('stereoGroup').hidden = !S.stereo;
     [0, 1].forEach((i) => { $('slot' + i).value = S.slots[i]; });
-    const activePreset = PRESETS.findIndex((p) => p.slots[0] === S.slots[0] && p.slots[1] === S.slots[1]);
-    $('presets').value = activePreset < 0 ? '' : String(activePreset);
     syncSeg('compare', S.stereo ? 2 : S.compare ? 1 : 0);
     document.body.classList.toggle('stereo', S.stereo);
-    document.title = `可视角度仿真 · ${activeDevices().join(' vs ')}`;
+    document.body.classList.toggle('compare-active', S.compare || S.stereo);
+    document.title = `可视角度仿真 · ${activeDevices().map(displayDevice).join(' vs ')}`;
     renderDevCards();
     renderSwatches();
     if (S.pattern) loadPattern(S.pattern);
@@ -1283,19 +1251,14 @@
     bmp.close();
     S.pattern = null;
     patternKey = '';
-    $('patterns').value = 'upload';
+    $('patterns').value = 'custom';
     window.StyledDropdown?.sync($('patterns'));
     setImage(cv);
     toast(`已载入 ${file.name || '图片'}`);
   }
-  $('patterns').addEventListener('change', (event) => {
-    if (event.target.value === 'upload') {
-      event.target.value = S.pattern || 'upload';
-      window.StyledDropdown?.sync(event.target);
-      $('file').click();
-    } else loadPattern(event.target.value);
-  });
-  $('file').addEventListener('change', (e) => loadFile(e.target.files[0]));
+  $('patterns').addEventListener('change', (event) => loadPattern(event.target.value));
+  $('uploadImage').addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', (e) => { const file = e.target.files[0]; e.target.value = ''; loadFile(file); });
 
   let dragDepth = 0;
   window.addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; document.body.classList.add('dragfile'); });
@@ -1328,7 +1291,6 @@
       if (S.mode) q.set('m', S.mode);
       if (S.rot) q.set('rot', S.rot);
       if (S.padMetric !== 'lum') q.set('k', S.padMetric);
-      if (S.pal !== 'jet') q.set('pal', S.pal);
       if (appMode === 'scene') q.set('mode', '3d');
       try { history.replaceState(null, '', '#' + q.toString()); } catch (err) { /* file:// 下个别浏览器不允许 */ }
     }, 300);
@@ -1348,7 +1310,6 @@
     S.mode = [0, 1, 2].includes(num('m', 0)) ? num('m', 0) : 0;
     S.rot = num('rot', 0) === 90 ? 90 : 0;
     if (q.get('k') === 'jncd') S.padMetric = 'jncd';
-    if (Viz.PALETTES[q.get('pal')]) S.pal = q.get('pal');
     appMode = /^(3d|scene)$/.test(q.get('mode') || '') ? 'scene' : 'sim';
     setView(num('t', 0), num('p', 0));
     syncSeg('mode', S.mode); syncSeg('orient', S.rot); syncSeg('padMetric', S.padMetric);
@@ -1356,7 +1317,7 @@
 
   // ---------- 模式：屏幕仿真（默认，本页原有工具）/ 场景演示（三维，scene3d.js，做动画用，从“画面 → 更多”进入） ----------
   let appMode = 'sim', scene3d = null, scene3dLoading = null;
-  const S3D_VER = 7;
+  const S3D_VER = 8;
   const loadScript = (src) => new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = src; s.onload = res; s.onerror = () => rej(new Error('无法加载 ' + src));
@@ -1368,7 +1329,7 @@
   function setAppMode(m) {
     appMode = m;
     document.body.classList.toggle('mode-3d', m === 'scene');
-    syncSeg('appMode', m);
+    $('close3d').setAttribute('aria-hidden', m === 'scene' ? 'false' : 'true');
     if (m === 'scene') {
       stopSweep();
       if (scene3d) scene3d.resume();
@@ -1376,7 +1337,11 @@
         $('scene3d').classList.add('loading');
         // 加载失败（或浏览器不支持 WebGL2）时退回屏幕仿真
         scene3dLoading = loadScene3D().then(() => window.Scene3D.mount($('scene3d')))
-          .then((a) => { scene3d = a; window.scene3d = a; $('scene3d').classList.remove('loading'); })
+          .then((a) => {
+            scene3d = a; window.scene3d = a; $('scene3d').classList.remove('loading');
+            decorateScene3D(a); applyTheme();
+            if (appMode !== 'scene') a.pause();
+          })
           .catch((err) => { console.error(err); scene3dLoading = null; $('scene3d').classList.remove('loading'); toast('三维场景加载失败，已切回屏幕仿真'); setAppMode('sim'); });
       }
     } else {
@@ -1385,13 +1350,69 @@
     }
     writeHash();
   }
-  bindSeg('appMode', (v) => setAppMode(v));
+
+  function decorateScene3D(instance) {
+    const original = $('scene3d').querySelector('[data-k="devices"]');
+    if (!original || $('scene3dDevices')) return;
+    const buttons = Array.from(original.querySelectorAll('button[data-v]'));
+    const select = document.createElement('select');
+    select.id = 'scene3dDevices';
+    select.dataset.styled = '';
+    select.setAttribute('aria-label', '三维场景机型');
+    buttons.forEach((button) => {
+      const opt = document.createElement('option');
+      opt.value = button.dataset.v;
+      opt.textContent = button.dataset.v === 'iphone18pm' ? 'iPhone 18 Pro Max (GH3)' : (button.title || button.textContent);
+      select.appendChild(opt);
+    });
+    original.classList.add('s3d-devices-original');
+    original.after(select);
+    window.StyledDropdown.init();
+    function syncDevice() {
+      const active = buttons.find((button) => button.classList.contains('on'));
+      if (active && select.value !== active.dataset.v) {
+        select.value = active.dataset.v;
+        window.StyledDropdown.sync(select);
+      }
+    }
+    select.addEventListener('change', () => {
+      const button = buttons.find((b) => b.dataset.v === select.value);
+      if (button) button.click(); else instance.setDevice(select.value);
+      setTimeout(syncDevice, 0);
+    });
+    const observer = new MutationObserver(syncDevice);
+    buttons.forEach((b) => observer.observe(b, { attributes: true, attributeFilter: ['class'] }));
+    syncDevice();
+    $('scene3d').querySelectorAll('select').forEach((el) => { el.dataset.styled = ''; });
+    window.StyledDropdown.init();
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  const themeButtons = [$('themeToggle'), $('sceneThemeToggle')];
+  const themeMode = () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  function applyTheme() {
+    const light = themeMode() === 'light';
+    document.documentElement.dataset.theme = light ? 'light' : 'dark';
+    $('themeToggle').textContent = light ? '深色模式' : '浅色模式';
+    $('themeToggle').setAttribute('aria-pressed', String(light));
+    $('sceneThemeToggle').textContent = light ? '☾' : '☀';
+    $('sceneThemeToggle').title = light ? '切换深色模式' : '切换浅色模式';
+    if (scene3d && scene3d.renderer) scene3d.renderer.setClearColor(light ? '#ecefe9' : '#111512', 1);
+  }
+  themeButtons.forEach((button) => button.addEventListener('click', () => {
+    document.documentElement.dataset.theme = themeMode() === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem('view-angle-theme', themeMode()); } catch (_) {}
+    applyTheme();
+  }));
+
   $('open3d').addEventListener('click', () => setAppMode('scene'));
+  $('close3d').addEventListener('click', () => setAppMode('sim'));
 
   // ---------- 启动 ----------
   window.addEventListener('resize', resize);
   readHash();
   window.StyledDropdown.init();
+  applyTheme();
   setDist(S.dist / 10);
   syncProfileUI();
   Patterns.ready.then(() => { if (S.pattern) loadPattern(S.pattern, true); });

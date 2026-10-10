@@ -8,7 +8,7 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT = os.path.join(ROOT, "野生的装机宅头像.webp")
+DEFAULT = os.path.join(ROOT, "头像.webp")
 
 
 def main():

@@ -10,7 +10,7 @@
 （例: 文件夹 "iphone18 Pro Max GH3" → 机型 "iPhone 18 Pro Max GH3"）。
 机型名含“防窥”的为防窥状态；路径含“防窥膜”时标记为贴膜（privacyKind = film），否则为防窥模式。
 
-用法:  python tools/convert_ang2.py [数据目录] [输出 data.js]
+默认扫描 Phone/Database/ 中的 .ang2 文件，输出路径记录为仓库相对路径。\n用法:  python tools/convert_ang2.py [数据目录] [输出 data.js]
 """
 
 import glob
@@ -93,7 +93,8 @@ def load(path):
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    src = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(here)
+    root = os.path.dirname(here)
+    src = sys.argv[1] if len(sys.argv) > 1 else os.path.join(root, "Phone", "Database")
     out = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(here), "web", "data.js")
 
     files = sorted(glob.glob(os.path.join(src, "**", "*.ang2"), recursive=True))
@@ -103,7 +104,7 @@ def main():
     groups = {}
     for p in files:
         s = load(p)
-        s["file"] = os.path.relpath(p, src).replace(os.sep, "/")
+        s["file"] = os.path.relpath(p, root).replace(os.sep, "/")
         key = " ".join(re.sub(r"垂直|水平|\d+(\.\d+)?°", " ", s["name"]).split())
         key = key.replace("防窥膜", "防窥")
         sub = os.path.dirname(os.path.relpath(p, src))
