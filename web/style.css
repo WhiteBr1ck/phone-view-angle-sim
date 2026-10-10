@@ -504,32 +504,7 @@ html[data-theme="light"] #scene3d .s3d-play.on { color: #fff; }
 .scene-controls .scene-theme { width: 42px; height: 42px; font-size: 19px; background: var(--surface-solid); }
 .theme-row .theme-trigger:hover,
 .scene-controls .scene-theme:hover { background: var(--raise-2); border-color: var(--accent); }
-.theme-trigger[aria-expanded="true"], .scene-theme[aria-expanded="true"] { border-color: var(--accent); }
 .theme-trigger:focus-visible, .scene-theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.theme-menu {
-  position: fixed; z-index: 300;
-  width: 176px; padding: 5px; color: var(--text);
-  border: 1px solid var(--line-2); border-radius: 12px;
-  background: var(--surface-solid);
-  box-shadow: 0 12px 34px rgba(0,0,0,.22);
-}
-.theme-menu[hidden] { display: none !important; }
-.theme-menu button {
-  display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: 10px; color: var(--text-2); background: transparent;
-  border: 0; border-radius: 8px; text-align: left;
-  font-size: 13px; line-height: 1.25;
-}
-.theme-menu button > i:first-child { font-size: 17px; color: var(--accent); }
-.theme-menu button span { flex: 1; }
-.theme-menu button .theme-check { display: none; color: var(--accent); font-size: 16px; }
-.theme-menu button:hover { color: var(--text); background: var(--raise-2); }
-.theme-menu button[aria-checked="true"] {
-  color: var(--text); font-weight: 600;
-  background: color-mix(in srgb, var(--accent) 16%, var(--surface-solid));
-}
-.theme-menu button[aria-checked="true"] .theme-check { display: inline-block; }
-
 /* 浅色主题的分段按钮必须与底色有明确的明度差，保持低饱和配色。 */
 html[data-theme="light"] .seg {
   background: #e5eae3; border-color: rgba(56,78,62,.23);
@@ -561,8 +536,6 @@ html[data-theme="light"] .scene-theme {
 html[data-theme="light"] .upload-action {
   background: #f5f8f3; border-color: rgba(56,78,62,.24); color: #344e3b;
 }
-html[data-theme="light"] .theme-menu button { color: #3e5444; }
-html[data-theme="light"] .theme-menu button[aria-checked="true"] { color: #1d3a28; }
 html[data-theme="light"] #scene3d .s3d-bar {
   border-color: rgba(56,78,62,.22);
   box-shadow: 0 12px 36px rgba(10,30,18,.20);
@@ -596,4 +569,47 @@ html[data-theme="light"] #scene3d .s3d-select select {
   #scene3d.s3d .s3d-hud { padding: 8px 10px; }
   .theme-row { padding-right: 12px; }
   .theme-row .theme-trigger { width: 32px; height: 32px; }
+}
+
+/* 快捷角度是持久选择，而非实时角度指示。颜色不跟着画面亮度变化。 */
+#thetaChips button {
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  background: var(--raise);
+  transition: background .14s, color .14s, border-color .14s;
+}
+#thetaChips button:hover { background: var(--raise-2); color: var(--text); }
+#thetaChips button.on {
+  background: var(--accent); border-color: var(--accent);
+  color: #142219; font-weight: 650;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+}
+/* 浅色模式下的所有可选项，即使未选中也具有可辨认的背景层级。 */
+html[data-theme="light"] #thetaChips button {
+  background: #e6ede5; border-color: #d1dcd1; color: #2f4a38;
+}
+html[data-theme="light"] #thetaChips button:hover {
+  background: #d6e3d6; color: #21402b;
+}
+html[data-theme="light"] #thetaChips button.on,
+html[data-theme="light"] #thetaChips button.on:hover {
+  background: #486f57; border-color: #486f57; color: #fff;
+}
+html[data-theme="light"] .seg button:not(.on) {
+  background: #e3ebe3; color: #344d3b;
+  box-shadow: inset 0 0 0 1px rgba(48,81,56,.06);
+}
+html[data-theme="light"] .seg button.on {
+  background: #fff; color: #1b3a25;
+  border-color: #b7cbb9; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(49,70,54,.12);
+}
+html[data-theme="light"] .seg button:hover:not(.on) {
+  background: #d5e2d5; color: #1d422b;
+}
+html[data-theme="light"] #sweep.play {
+  background: #e7eee7; border: 1px solid #d1dcd1; color: #2e4836;
+}
+html[data-theme="light"] #sweep.play.on {
+  background: #486f57; border-color: #486f57; color: #fff;
 }
