@@ -58,8 +58,8 @@ h2 { margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--text-2); 
 .brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .02em; }
 .logo {
   width: 16px; height: 16px; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  background: conic-gradient(from 200deg, #3987e5, #9ec5f4, #0d366b, #3987e5);
+  box-shadow: 0 0 0 3px rgba(57,135,229,.15);
 }
 .tag {
   font-size: 11px; font-weight: 500; color: var(--text-2);
@@ -289,7 +289,10 @@ body.dragfile #drop { display: flex; }
 #tabs { display: none; }
 
 /* 宽屏：左栏（读数 + 视角）| 舞台 | 右栏（机型 + 画面） */
-body[data-layout="wide"] #rail { position: fixed; left: 20px; top: 20px; bottom: 20px; width: 300px; }
+body[data-layout="wide"] #rail {
+  position: fixed; left: 20px; top: 20px; bottom: auto; width: 300px;
+  height: auto; max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
+}
 body[data-layout="wide"] #hud { padding: 20px 20px 8px; }
 body[data-layout="wide"] #panel { position: fixed; right: 20px; top: 20px; width: 300px; max-height: calc(100% - 40px); }
 
@@ -483,3 +486,114 @@ html[data-theme="light"] #scene3d .ann-leaders circle { fill: var(--accent); }
 html[data-theme="light"] #scene3d .tl-chip.cur,
 html[data-theme="light"] #scene3d .s3d-play.on { color: #fff; }
 #scene3d .s3d-bar .site-select-menu { max-height: 320px; }
+
+/* 外观：圆形 RemixIcon 触发器，菜单在独立层避免被侧栏裁切。 */
+.theme-row {
+  padding: 8px 14px 8px 18px;
+  min-height: 48px;
+}
+.theme-row .theme-trigger,
+.scene-controls .scene-theme {
+  display: grid; place-items: center; padding: 0; flex: none;
+  width: 34px; height: 34px; border-radius: 50%;
+  font-size: 18px; line-height: 1;
+  color: var(--text); background: var(--raise);
+  border: 1px solid var(--line-2);
+  transition: border-color .16s, background .16s;
+}
+.scene-controls .scene-theme { width: 42px; height: 42px; font-size: 19px; background: var(--surface-solid); }
+.theme-row .theme-trigger:hover,
+.scene-controls .scene-theme:hover { background: var(--raise-2); border-color: var(--accent); }
+.theme-trigger[aria-expanded="true"], .scene-theme[aria-expanded="true"] { border-color: var(--accent); }
+.theme-trigger:focus-visible, .scene-theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-menu {
+  position: fixed; z-index: 300;
+  width: 176px; padding: 5px; color: var(--text);
+  border: 1px solid var(--line-2); border-radius: 12px;
+  background: var(--surface-solid);
+  box-shadow: 0 12px 34px rgba(0,0,0,.22);
+}
+.theme-menu[hidden] { display: none !important; }
+.theme-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 10px; color: var(--text-2); background: transparent;
+  border: 0; border-radius: 8px; text-align: left;
+  font-size: 13px; line-height: 1.25;
+}
+.theme-menu button > i:first-child { font-size: 17px; color: var(--accent); }
+.theme-menu button span { flex: 1; }
+.theme-menu button .theme-check { display: none; color: var(--accent); font-size: 16px; }
+.theme-menu button:hover { color: var(--text); background: var(--raise-2); }
+.theme-menu button[aria-checked="true"] {
+  color: var(--text); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-solid));
+}
+.theme-menu button[aria-checked="true"] .theme-check { display: inline-block; }
+
+/* 浅色主题的分段按钮必须与底色有明确的明度差，保持低饱和配色。 */
+html[data-theme="light"] .seg {
+  background: #e5eae3; border-color: rgba(56,78,62,.23);
+}
+html[data-theme="light"] .seg button {
+  color: #46594b; font-weight: 500;
+}
+html[data-theme="light"] .seg button:hover {
+  color: #213a29; background: rgba(70,102,78,.12);
+}
+html[data-theme="light"] .seg button.on {
+  color: #183828; font-weight: 650;
+  background: #fafcf8; box-shadow: 0 1px 3px rgba(49,70,54,.18);
+}
+html[data-theme="light"] #panel .site-select-trigger {
+  background: #fff; border-color: rgba(56,78,62,.24); color: #2a4030;
+}
+html[data-theme="light"] .site-select-option {
+  color: #455749;
+}
+html[data-theme="light"] .site-select-option.selected {
+  color: #1e3d2c; background: #e4eee6;
+  font-weight: 600;
+}
+html[data-theme="light"] .theme-trigger,
+html[data-theme="light"] .scene-theme {
+  background: #f5f8f3; border-color: rgba(56,78,62,.24); color: #284330;
+}
+html[data-theme="light"] .upload-action {
+  background: #f5f8f3; border-color: rgba(56,78,62,.24); color: #344e3b;
+}
+html[data-theme="light"] .theme-menu button { color: #3e5444; }
+html[data-theme="light"] .theme-menu button[aria-checked="true"] { color: #1d3a28; }
+html[data-theme="light"] #scene3d .s3d-bar {
+  border-color: rgba(56,78,62,.22);
+  box-shadow: 0 12px 36px rgba(10,30,18,.20);
+}
+html[data-theme="light"] #scene3d .s3d-seg button { color: #405649; font-weight: 500; }
+html[data-theme="light"] #scene3d .s3d-seg button.on {
+  background: #e1eae0; color: #1c3e2b; font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(56,90,63,.12);
+}
+html[data-theme="light"] #scene3d .s3d-btn,
+html[data-theme="light"] #scene3d .s3d-select select {
+  background: #f4f7f1; color: #2e4836; border-color: rgba(56,78,62,.25);
+}
+
+/* 3D 场景背景本身为暗色。HUD 始终以亮字 + 局部暗底确保读数对比度，
+   与工具栏选择的明暗模式独立。 */
+#scene3d.s3d .s3d-hud {
+  --t: #eef3ed; --t2: #d0dbd0; --mu: #b3c2b6;
+  color: #eef3ed; background: rgba(13,18,17,.72);
+  border: 1px solid rgba(236,245,235,.10);
+  padding: 12px 15px; border-radius: 13px;
+  box-shadow: 0 7px 24px rgba(0,0,0,.18);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+#scene3d.s3d .s3d-hud .s3d-hero [data-k="theta"] { color: #f3f6ef; }
+#scene3d.s3d .s3d-hud .s3d-scene,
+#scene3d.s3d .s3d-hud .s3d-hero-sub,
+#scene3d.s3d .s3d-hud .s3d-stats i { color: #c5d4c6; }
+#scene3d.s3d .s3d-hud .s3d-stats b { color: #eef3ed; }
+@media (max-width: 760px) {
+  #scene3d.s3d .s3d-hud { padding: 8px 10px; }
+  .theme-row { padding-right: 12px; }
+  .theme-row .theme-trigger { width: 32px; height: 32px; }
+}

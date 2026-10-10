@@ -4,9 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem("view-angle-theme")==="light"?"light":"dark"}catch(e){document.documentElement.dataset.theme="dark"}</script>
+<script>
+(function () {
+  let choice = 'auto';
+  try { choice = localStorage.getItem('view-angle-theme') || 'auto'; } catch (_) {}
+  if (!['auto','light','dark'].includes(choice)) choice = 'auto';
+  document.documentElement.dataset.themeMode = choice;
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = choice === 'auto' ? (prefersDark ? 'dark' : 'light') : choice;
+})();
+</script>
 <title>可视角度仿真</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.9.0/fonts/remixicon.css">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body data-layout="wide">
 <div class="sframe" id="sf0"></div>
@@ -14,7 +24,7 @@
 <canvas id="gl" aria-label="手机屏幕可视角仿真画面"></canvas>
 <div id="scene3d" aria-label="三维场景演示"></div>
 <div class="scene-controls" id="sceneControls">
-  <button type="button" class="scene-theme" id="sceneThemeToggle" aria-label="切换明暗主题" title="切换明暗主题">◐</button>
+  <button type="button" class="scene-theme" id="sceneThemeToggle" aria-label="设置外观" aria-haspopup="menu" aria-expanded="false" title="设置外观"><i class="ri-computer-line" aria-hidden="true"></i></button>
   <button type="button" class="scene-close" id="close3d" aria-label="关闭三维场景，返回屏幕仿真" title="返回屏幕仿真">×</button>
 </div>
 
@@ -39,7 +49,7 @@
     <button data-tab="screen" role="tab">画面</button>
     <span class="tabs-fold" aria-hidden="true"></span>
   </nav>
-  <div class="theme-row"><span>外观</span><button id="themeToggle" type="button" aria-label="切换明暗模式">浅色模式</button></div>
+  <div class="theme-row"><span>外观</span><button id="themeToggle" class="theme-trigger" type="button" aria-label="设置外观" aria-haspopup="menu" aria-expanded="false" title="设置外观"><i class="ri-computer-line" aria-hidden="true"></i></button></div>
   <div id="panelBody">
 
     <!-- ===== 视角 ===== -->
@@ -195,6 +205,11 @@
 <div id="toast"></div>
 <div id="hint">拖动画面转动手机 · 拖动左侧方向盘直接选角度 · 滚轮调距离 · 空格自动扫描</div>
 <div id="drop">松开以加载图片</div>
+<div id="themeMenu" class="theme-menu" role="menu" aria-label="外观模式" hidden>
+  <button type="button" role="menuitemradio" data-theme-choice="auto" aria-checked="false"><i class="ri-computer-line" aria-hidden="true"></i><span>跟随系统</span><i class="ri-check-line theme-check" aria-hidden="true"></i></button>
+  <button type="button" role="menuitemradio" data-theme-choice="light" aria-checked="false"><i class="ri-sun-line" aria-hidden="true"></i><span>浅色模式</span><i class="ri-check-line theme-check" aria-hidden="true"></i></button>
+  <button type="button" role="menuitemradio" data-theme-choice="dark" aria-checked="false"><i class="ri-moon-line" aria-hidden="true"></i><span>深色模式</span><i class="ri-check-line theme-check" aria-hidden="true"></i></button>
+</div>
 
 <script src="data.js"></script>
 <script src="model.js?v=12"></script>
@@ -205,6 +220,6 @@
 <script src="viz.js?v=12"></script>
 <!-- 三维场景（scene3d-person.js、scene3d.js）只在进入场景演示时再加载，见 app.js -->
 <script src="dropdown.js?v=2"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

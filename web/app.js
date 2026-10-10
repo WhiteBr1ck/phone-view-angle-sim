@@ -260,7 +260,7 @@
   }
   // ---------- WebGL ----------
   const canvas = $('gl');
-  const gl = canvas.getContext('webgl2', { antialias: true, depth: true });
+  const gl = canvas.getContext('webgl2', { antialias: true, depth: true, preserveDrawingBuffer: true });
   if (!gl) {
     document.body.insertAdjacentHTML('beforeend', '<p style="position:fixed;top:45%;width:100%;text-align:center;color:#ff6b6b">浏览器不支持 WebGL2，请使用新版 Chrome / Edge / Safari / Firefox。</p>');
     return;
@@ -1388,22 +1388,84 @@
     window.dispatchEvent(new Event('resize'));
   }
 
+  // 三态外观：auto / light / dark。用户选 auto 后始终跟随系统主题。
+  const themeRoot = document.documentElement;
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
   const themeButtons = [$('themeToggle'), $('sceneThemeToggle')];
-  const themeMode = () => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const themeMenu = $('themeMenu');
+  const THEME_LABELS = { auto: '跟随系统', light: '浅色模式', dark: '深色模式' };
+  const THEME_ICONS = { auto: 'ri-computer-line', light: 'ri-sun-line', dark: 'ri-moon-line' };
+  let themeAnchor = null;
+  const themeChoice = () => ['auto', 'light', 'dark'].includes(themeRoot.dataset.themeMode) ? themeRoot.dataset.themeMode : 'auto';
+
   function applyTheme() {
-    const light = themeMode() === 'light';
-    document.documentElement.dataset.theme = light ? 'light' : 'dark';
-    $('themeToggle').textContent = light ? '深色模式' : '浅色模式';
-    $('themeToggle').setAttribute('aria-pressed', String(light));
-    $('sceneThemeToggle').textContent = light ? '☾' : '☀';
-    $('sceneThemeToggle').title = light ? '切换深色模式' : '切换浅色模式';
-    if (scene3d && scene3d.renderer) scene3d.renderer.setClearColor(light ? '#ecefe9' : '#111512', 1);
+    const choice = themeChoice();
+    const effective = choice === 'auto' ? (systemDark.matches ? 'dark' : 'light') : choice;
+    themeRoot.dataset.theme = effective;
+    themeButtons.forEach((button) => {
+      button.innerHTML = '<i class="' + THEME_ICONS[choice] + '" aria-hidden="true"></i>';
+      button.setAttribute('aria-label', '外观：' + THEME_LABELS[choice] + '，点击选择模式');
+      button.title = '外观：' + THEME_LABELS[choice];
+    });
+    themeMenu.querySelectorAll('[data-theme-choice]').forEach((button) => {
+      button.setAttribute('aria-checked', String(button.dataset.themeChoice === choice));
+    });
+    // 不改变三维场景光照，只更新工具栏配色；HUD 在暗色场景上始终保持高对比度。
+    requestRender();
   }
+
+  function closeThemeMenu(restoreFocus = false) {
+    if (themeMenu.hidden) return;
+    themeMenu.hidden = true;
+    themeButtons.forEach((button) => button.setAttribute('aria-expanded', 'false'));
+    const last = themeAnchor;
+    themeAnchor = null;
+    if (restoreFocus && last) last.focus();
+  }
+
+  function positionThemeMenu() {
+    if (themeMenu.hidden || !themeAnchor) return;
+    const rect = themeAnchor.getBoundingClientRect();
+    const menuRect = themeMenu.getBoundingClientRect();
+    const width = menuRect.width, height = menuRect.height;
+    themeMenu.style.left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width)) + 'px';
+    const top = rect.bottom + height + 6 <= window.innerHeight
+      ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
+    themeMenu.style.top = top + 'px';
+  }
+
   themeButtons.forEach((button) => button.addEventListener('click', () => {
-    document.documentElement.dataset.theme = themeMode() === 'light' ? 'dark' : 'light';
-    try { localStorage.setItem('view-angle-theme', themeMode()); } catch (_) {}
-    applyTheme();
+    if (!themeMenu.hidden && themeAnchor === button) {
+      closeThemeMenu();
+      return;
+    }
+    closeThemeMenu();
+    themeAnchor = button;
+    themeMenu.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    positionThemeMenu();
   }));
+  themeMenu.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-theme-choice]');
+    if (!item) return;
+    const choice = item.dataset.themeChoice;
+    if (!THEME_LABELS[choice]) return;
+    themeRoot.dataset.themeMode = choice;
+    try { localStorage.setItem('view-angle-theme', choice); } catch (_) {}
+    applyTheme();
+    closeThemeMenu(true);
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!themeMenu.hidden && !themeMenu.contains(event.target) &&
+        !themeButtons.some((button) => button.contains(event.target))) closeThemeMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !themeMenu.hidden) { event.preventDefault(); closeThemeMenu(true); }
+  });
+  window.addEventListener('resize', () => { if (!themeMenu.hidden) positionThemeMenu(); });
+  const onSystemThemeChange = () => { if (themeChoice() === 'auto') applyTheme(); };
+  if (systemDark.addEventListener) systemDark.addEventListener('change', onSystemThemeChange);
+  else if (systemDark.addListener) systemDark.addListener(onSystemThemeChange);
 
   $('open3d').addEventListener('click', () => setAppMode('scene'));
   $('close3d').addEventListener('click', () => setAppMode('sim'));
